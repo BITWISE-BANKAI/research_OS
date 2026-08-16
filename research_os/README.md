@@ -150,51 +150,6 @@ FastAPI (app.py)
     └── /api/deep-research → Iterative: Generate → Evaluate → Regenerate
 ```
 
----
-
-## Integrating with a JavaScript Website
-
-RESEARCHOS exposes a clean REST API. To embed it in any JS/CSS frontend:
-
-```javascript
-// Search papers
-const results = await fetch('http://localhost:8000/api/search', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ query: 'transformer attention' })
-}).then(r => r.json());
-
-// Index a paper
-await fetch('http://localhost:8000/api/index', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ paper: results.papers[0] })
-});
-
-// Chat
-const answer = await fetch('http://localhost:8000/api/chat', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ query: 'What dataset did this paper use?', mode: 'library' })
-}).then(r => r.json());
-// answer.answer, answer.sources, answer.retrieved_chunks
-
-// Deep research
-const briefing = await fetch('http://localhost:8000/api/deep-research', {
-  method: 'POST',
-  headers: { 'Content-Type': 'application/json' },
-  body: JSON.stringify({ query: 'LLM hallucination', paper_ids: ['abc123'], max_iterations: 3 })
-}).then(r => r.json());
-```
-
-Add CORS to `app.py` for cross-origin access:
-
-```python
-from fastapi.middleware.cors import CORSMiddleware
-app.add_middleware(CORSMiddleware, allow_origins=["*"], allow_methods=["*"], allow_headers=["*"])
-```
-
----
 
 
 
