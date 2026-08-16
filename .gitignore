@@ -1,0 +1,39 @@
+# Environment secrets
+.env
+.env.*
+!.env.example
+
+# Python virtual environments
+.venv/
+venv/
+env/
+ENV/
+
+# Python cache and test artifacts
+__pycache__/
+*.py[cod]
+*$py.class
+.pytest_cache/
+.coverage
+htmlcov/
+
+# Logs and local temp data
+logs/
+tmp/
+temp/
+*.log
+
+# Data folders that are typically local/generated
+data/
+
+# Build output
+build/
+dist/
+coverage/
+node_modules/
+
+# OS and editor metadata
+.DS_Store
+Thumbs.db
+.vscode/
+.idea/
