@@ -1,0 +1,369 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>RESEARCHOS — Local AI Research Intelligence</title>
+  <meta name="description" content="A local-first AI research intelligence platform powered by Ollama, ChromaDB, MongoDB, and Semantic Scholar. Ask questions across research papers with fully grounded RAG answers." />
+  <link rel="stylesheet" href="/static/style.css" />
+  <!-- KaTeX for LaTeX math rendering -->
+  <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.css" />
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/katex.min.js"></script>
+  <script defer src="https://cdn.jsdelivr.net/npm/katex@0.16.9/dist/contrib/auto-render.min.js"
+    onload="window._katexReady = true;"></script>
+  <!-- marked.js for full Markdown rendering -->
+  <script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"></script>
+  <link rel="icon" href="data:image/svg+xml,<svg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 100 100'><text y='.9em' font-size='90'>🔭</text></svg>" />
+</head>
+<body>
+
+<div id="app">
+
+  <!-- ═══ SIDEBAR ═══════════════════════════════════ -->
+  <aside id="sidebar">
+
+    <!-- Logo -->
+    <div class="logo-wrap">
+      <div class="logo">
+        <div class="logo-icon">🔭</div>
+        <div>
+          <div class="logo-text">Research<span>OS</span></div>
+          <div class="logo-sub">AI Research Intelligence</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Navigation modes -->
+    <div class="sidebar-section">
+      <div class="sidebar-label">Navigation</div>
+      <button class="mode-btn active" id="nav-search" onclick="switchPanel('search')">
+        <span class="icon">🔍</span> Search Papers
+      </button>
+      <button class="mode-btn" id="nav-chat" onclick="switchPanel('chat')">
+        <span class="icon">💬</span> RAG Chat
+      </button>
+      <button class="mode-btn" id="nav-compare" onclick="switchPanel('compare')">
+        <span class="icon">⚖️</span> Compare Papers
+      </button>
+      <button class="mode-btn" id="nav-deep" onclick="switchPanel('deep')">
+        <span class="icon">🧠</span> Deep Research
+      </button>
+      <button class="mode-btn" id="nav-mongo" onclick="switchPanel('mongo')">
+        <span class="icon">🗄️</span> JSON Memory
+      </button>
+    </div>
+
+    <div class="divider" style="margin: 0 14px;"></div>
+
+    <!-- Chat mode selector -->
+    <div class="sidebar-section">
+      <div class="sidebar-label">Chat Mode</div>
+      <button class="mode-btn active" id="chat-mode-library" onclick="setChatMode('library')">
+        <span class="icon">📚</span> Research Library
+      </button>
+      <button class="mode-btn" id="chat-mode-single" onclick="setChatMode('single')">
+        <span class="icon">📄</span> Single Paper
+      </button>
+    </div>
+
+    <div class="divider" style="margin: 0 14px;"></div>
+
+    <!-- Indexed papers -->
+    <div class="sidebar-section" style="flex: 1;">
+      <div class="sidebar-label" style="display:flex;justify-content:space-between;align-items:center;">
+        <span>Indexed Papers</span>
+        <button class="btn btn-glass btn-sm btn-icon" title="Refresh" onclick="loadIndexedPapers()">↻</button>
+      </div>
+      <div id="indexed-list">
+        <div class="empty-hint">No papers indexed yet.</div>
+      </div>
+    </div>
+
+  </aside>
+
+  <!-- ═══ MAIN ═══════════════════════════════════════ -->
+  <main id="main">
+
+    <!-- Topbar -->
+    <div id="topbar">
+      <div>
+        <div class="topbar-title" id="topbar-title">🔍 Search Papers</div>
+        <div class="topbar-subtitle" id="topbar-subtitle">Discover research via Semantic Scholar</div>
+      </div>
+      <div class="flex-row" style="gap:12px;">
+        <div id="mongo-status-badge" class="badge" style="background:rgba(16,185,129,0.15);border:1px solid rgba(16,185,129,0.3);color:#34d399;font-size:11px;display:flex;align-items:center;gap:6px;padding:4px 8px;border-radius:20px;">
+          <div class="status-dot" id="mongo-dot" style="width:7px;height:7px;background:#10b981;"></div>
+          <span id="mongo-status-text">MongoDB: Checking…</span>
+        </div>
+        <div class="flex-row" style="gap:6px;">
+          <div class="status-dot" title="Server online"></div>
+          <span style="font-size:12px;color:var(--text-muted)">ChromaDB · Ollama</span>
+        </div>
+      </div>
+    </div>
+
+    <!-- ══ SEARCH PANEL ══════════════════════════════ -->
+    <div class="panel active" id="panel-search">
+      <div class="search-hero">
+        <h2>Discover Research</h2>
+        <p>Search Semantic Scholar and index papers into your local AI knowledge base (MongoDB + ChromaDB).</p>
+      </div>
+
+      <div class="search-box">
+        <input class="search-input" id="search-q" type="text" placeholder="e.g. transformer attention mechanism, LLM hallucination, RAG systems…" />
+        <button class="btn btn-primary" id="search-btn" onclick="doSearch()">
+          <span>🔍</span> Search
+        </button>
+        <button class="btn btn-glass" onclick="openManualPaperModal()" title="Add manual paper or custom notes">
+          <span>➕</span> Add Manual Paper
+        </button>
+      </div>
+
+      <div id="search-status" style="font-size:13px;color:var(--text-muted);min-height:20px;"></div>
+
+      <div id="results-grid"></div>
+    </div>
+
+
+    <!-- ══ CHAT PANEL ════════════════════════════════ -->
+    <div class="panel" id="panel-chat" style="display:none;">
+      <div class="chat-toolbar">
+        <span class="mode-badge" id="chat-mode-badge">📚 LIBRARY MODE</span>
+        <div id="single-paper-selector" style="display:none;align-items:center;gap:8px;">
+          <span style="font-size:12px;color:var(--text-muted)">Paper:</span>
+          <select id="single-paper-select" style="background:var(--glass-bg);border:1px solid var(--glass-border);color:var(--text-primary);padding:6px 10px;border-radius:8px;font-size:12px;outline:none;">
+            <option value="">— Select paper —</option>
+          </select>
+        </div>
+        <div class="flex-1"></div>
+        <button class="btn btn-glass btn-sm" onclick="clearChat()">🗑 Clear Chat</button>
+      </div>
+
+      <div id="messages">
+        <div class="msg assistant">
+          <div class="msg-avatar">🤖</div>
+          <div class="msg-body">
+            <div class="msg-bubble">
+              <strong>Welcome to RESEARCHOS!</strong><br/>
+              I'm your local AI research assistant. I answer questions strictly from indexed paper evidence stored in ChromaDB &amp; MongoDB — no hallucinations, full citations.<br/><br/>
+              👉 <strong>Search &amp; index papers first</strong>, then ask me anything about them here.
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <div class="chat-input-wrap">
+        <div class="chat-input-row">
+          <textarea id="chat-input" rows="1" placeholder="Ask a question about the indexed research…" onkeydown="handleChatKey(event)" oninput="autoResize(this)"></textarea>
+          <button class="btn btn-primary btn-icon" id="send-btn" onclick="sendMessage()" title="Send">➤</button>
+        </div>
+        <div class="chat-hint">Enter to send · Shift+Enter for new line</div>
+      </div>
+    </div>
+
+    <!-- ══ COMPARE PANEL ═════════════════════════════ -->
+    <div class="panel" id="panel-compare" style="display:none;">
+      <div class="panel-header">
+        <h2>⚖️ Compare Papers</h2>
+        <p>Select 2 or more indexed papers to generate a structured comparative analysis.</p>
+      </div>
+
+      <div class="result-block">
+        <div class="result-block-header">Select Papers to Compare</div>
+        <div style="padding:16px;">
+          <div class="paper-selector" id="compare-selector">
+            <div class="empty-hint">Index papers first to see them here.</div>
+          </div>
+          <div class="mt-4">
+            <input class="search-input" id="compare-query" style="margin-bottom:10px;" placeholder="Optional: focus comparison on a topic (e.g. methodology, performance)…" />
+            <button class="btn btn-primary" id="compare-btn" onclick="doCompare()">
+              <span>⚖️</span> Compare Selected Papers
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <div id="compare-result" style="display:none;" class="result-block">
+        <div class="result-block-header">
+          <span>📊 Comparative Analysis</span>
+          <button class="btn btn-glass btn-sm" onclick="copyResult('compare-result-body')">📋 Copy</button>
+        </div>
+        <div class="result-block-body" id="compare-result-body"></div>
+      </div>
+    </div>
+
+    <!-- ══ DEEP RESEARCH PANEL ═══════════════════════ -->
+    <div class="panel" id="panel-deep" style="display:none;">
+      <div class="panel-header">
+        <h2>🧠 Deep Research Briefing</h2>
+        <p>Generate a multi-phase, evidence-grounded research briefing with iterative self-evaluation.</p>
+      </div>
+
+      <div class="result-block">
+        <div class="result-block-header">Configure Deep Research</div>
+        <div style="padding:16px;display:flex;flex-direction:column;gap:12px;">
+          <input class="search-input" id="deep-query" placeholder="Research topic (e.g. LLM hallucination, vision transformers, RLHF)…" />
+          <div>
+            <div class="sidebar-label" style="margin-bottom:8px;">Select Papers</div>
+            <div class="paper-selector" id="deep-selector">
+              <div class="empty-hint">Index papers first to select them here.</div>
+            </div>
+          </div>
+          <div class="flex-row">
+            <div style="font-size:12px;color:var(--text-muted);">Max iterations:</div>
+            <select id="deep-max-iter" style="background:var(--glass-bg);border:1px solid var(--glass-border);color:var(--text-primary);padding:6px 10px;border-radius:8px;font-size:12px;outline:none;">
+              <option value="1">1</option>
+              <option value="2">2</option>
+              <option value="3" selected>3</option>
+            </select>
+            <div style="font-size:12px;color:var(--text-muted);">Score threshold:</div>
+            <select id="deep-threshold" style="background:var(--glass-bg);border:1px solid var(--glass-border);color:var(--text-primary);padding:6px 10px;border-radius:8px;font-size:12px;outline:none;">
+              <option value="7">7 / 10</option>
+              <option value="8" selected>8 / 10</option>
+              <option value="9">9 / 10</option>
+            </select>
+            <button class="btn btn-primary" id="deep-btn" onclick="doDeepResearch()">
+              <span>🧠</span> Generate Briefing
+            </button>
+          </div>
+        </div>
+      </div>
+
+      <!-- Progress -->
+      <div class="progress-steps" id="deep-progress" style="display:none;">
+        <div class="step" id="step-retrieve"><div class="step-icon">📡</div> Retrieving evidence from indexed papers…</div>
+        <div class="step" id="step-generate"><div class="step-icon">✍️</div> Generating initial research briefing…</div>
+        <div class="step" id="step-evaluate"><div class="step-icon">🔬</div> Evaluating briefing quality…</div>
+        <div class="step" id="step-regen"><div class="step-icon">🔄</div> Regenerating with feedback…</div>
+        <div class="step" id="step-final"><div class="step-icon">✅</div> Finalising report…</div>
+      </div>
+
+      <!-- Result -->
+      <div id="deep-result" style="display:none;" class="result-block">
+        <div class="result-block-header">
+          <span>📋 Deep Research Report</span>
+          <div class="flex-row">
+            <span id="deep-score-badge"></span>
+            <button class="btn btn-glass btn-sm" onclick="copyResult('deep-result-body')">📋 Copy</button>
+          </div>
+        </div>
+        <div class="result-block-body" id="deep-result-body"></div>
+      </div>
+    </div>
+
+    <!-- ══ MONGO / JSON MEMORY PANEL ═════════════════ -->
+    <div class="panel" id="panel-mongo" style="display:none;">
+      <div class="panel-header">
+        <h2>🗄️ JSON Memory &amp; MongoDB Storage</h2>
+        <p>Inspect raw and structured JSON files stored in MongoDB across papers, chunks, briefings, and chat history.</p>
+      </div>
+
+      <!-- Stats Cards -->
+      <div class="grid grid-4" style="margin-bottom:20px;" id="mongo-stats-grid">
+        <div class="stat-card">
+          <div class="stat-num" id="stat-papers">0</div>
+          <div class="stat-lbl">Papers JSON</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-num" id="stat-chunks">0</div>
+          <div class="stat-lbl">Document Chunks</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-num" id="stat-briefings">0</div>
+          <div class="stat-lbl">Deep Briefings</div>
+        </div>
+        <div class="stat-card">
+          <div class="stat-num" id="stat-chats">0</div>
+          <div class="stat-lbl">QA Interactions</div>
+        </div>
+      </div>
+
+      <!-- Sub-Tabs for MongoDB collections -->
+      <div class="flex-row" style="gap:8px;margin-bottom:16px;border-bottom:1px solid var(--glass-border);padding-bottom:10px;">
+        <button class="btn btn-primary btn-sm" id="tab-mongo-papers" onclick="switchMongoTab('papers')">📄 Papers JSON</button>
+        <button class="btn btn-glass btn-sm" id="tab-mongo-briefings" onclick="switchMongoTab('briefings')">🧠 Briefings JSON</button>
+        <button class="btn btn-glass btn-sm" id="tab-mongo-history" onclick="switchMongoTab('history')">💬 Chat Logs JSON</button>
+        <button class="btn btn-glass btn-sm" id="tab-mongo-comparisons" onclick="switchMongoTab('comparisons')">⚖️ Comparisons JSON</button>
+      </div>
+
+      <div id="mongo-content-area" class="result-block">
+        <div class="result-block-header">
+          <span id="mongo-content-title">Stored Records</span>
+          <button class="btn btn-glass btn-sm" onclick="refreshMongoView()">↻ Refresh</button>
+        </div>
+        <div class="result-block-body" id="mongo-content-body" style="max-height:550px;overflow-y:auto;padding:16px;">
+          <div class="empty-hint">Loading stored JSON records…</div>
+        </div>
+      </div>
+    </div>
+
+  </main>
+</div>
+
+<!-- Modal for Raw JSON view -->
+<div id="json-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);backdrop-filter:blur(6px);z-index:9999;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:var(--bg-surface);border:1px solid var(--glass-border);border-radius:14px;max-width:800px;width:100%;max-height:85vh;display:flex;flex-direction:column;box-shadow:0 20px 50px rgba(0,0,0,0.5);">
+    <div style="padding:14px 20px;border-bottom:1px solid var(--glass-border);display:flex;justify-content:space-between;align-items:center;">
+      <h3 style="margin:0;font-size:16px;color:var(--text-primary);" id="json-modal-title">JSON Document</h3>
+      <button class="btn btn-glass btn-sm" onclick="closeJsonModal()">✕ Close</button>
+    </div>
+    <div style="padding:16px;overflow:auto;flex:1;">
+      <pre id="json-modal-content" style="background:#050810;padding:14px;border-radius:8px;font-family:'JetBrains Mono', monospace;font-size:12px;color:#a5b4fc;margin:0;white-space:pre-wrap;word-break:break-word;"></pre>
+    </div>
+    <div style="padding:12px 20px;border-top:1px solid var(--glass-border);display:flex;justify-content:flex-end;gap:10px;">
+      <button class="btn btn-glass btn-sm" onclick="copyResult('json-modal-content')">📋 Copy JSON</button>
+      <button class="btn btn-primary btn-sm" onclick="downloadModalJson()">⬇ Download JSON</button>
+    </div>
+  <!-- Modal for Manual Paper Entry -->
+<div id="manual-paper-modal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,0.8);backdrop-filter:blur(8px);z-index:9999;align-items:center;justify-content:center;padding:20px;">
+  <div style="background:var(--bg-surface);border:1px solid var(--glass-border);border-radius:16px;max-width:650px;width:100%;max-height:90vh;display:flex;flex-direction:column;box-shadow:var(--shadow-glow);">
+    <div style="padding:16px 22px;border-bottom:1px solid var(--glass-border);display:flex;justify-content:space-between;align-items:center;">
+      <div>
+        <h3 style="margin:0;font-size:16px;color:var(--text-primary);">➕ Add Manual Research Paper</h3>
+        <p style="margin:0;font-size:11px;color:var(--text-muted);">Directly index custom text, notes, or pre-downloaded research papers into MongoDB & ChromaDB</p>
+      </div>
+      <button class="btn btn-glass btn-sm" onclick="closeManualPaperModal()">✕</button>
+    </div>
+    <div style="padding:20px;overflow-y:auto;flex:1;display:flex;flex-direction:column;gap:14px;">
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:4px;">Paper Title *</label>
+        <input id="manual-title" class="search-input" style="width:100%;font-size:13px;" placeholder="e.g. Attention Is All You Need" />
+      </div>
+      <div style="display:grid;grid-template-columns:2fr 1fr;gap:12px;">
+        <div>
+          <label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:4px;">Authors (comma-separated)</label>
+          <input id="manual-authors" class="search-input" style="width:100%;font-size:13px;" placeholder="e.g. Ashish Vaswani, Noam Shazeer" />
+        </div>
+        <div>
+          <label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:4px;">Year</label>
+          <input id="manual-year" type="number" class="search-input" style="width:100%;font-size:13px;" placeholder="2024" value="2024" />
+        </div>
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:4px;">Abstract / Summary</label>
+        <textarea id="manual-abstract" class="search-input" style="width:100%;height:80px;font-size:13px;resize:vertical;" placeholder="Key abstract findings..."></textarea>
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:4px;">Full Content / Notes (will be chunked & embedded)</label>
+        <textarea id="manual-content" class="search-input" style="width:100%;height:130px;font-size:13px;resize:vertical;" placeholder="Paste paper sections, methodologies, notes, or findings here..."></textarea>
+      </div>
+      <div>
+        <label style="font-size:12px;font-weight:600;color:var(--text-secondary);display:block;margin-bottom:4px;">Source URL / DOI (Optional)</label>
+        <input id="manual-url" class="search-input" style="width:100%;font-size:13px;" placeholder="https://arxiv.org/abs/..." />
+      </div>
+    </div>
+    <div style="padding:14px 22px;border-top:1px solid var(--glass-border);display:flex;justify-content:flex-end;gap:10px;">
+      <button class="btn btn-glass" onclick="closeManualPaperModal()">Cancel</button>
+      <button class="btn btn-primary" id="manual-submit-btn" onclick="submitManualPaper()">⬇ Index into Knowledge Base</button>
+    </div>
+  </div>
+</div>
+
+<!-- Toast container -->
+<div id="toast-container"></div>
+
+
+<script src="/static/script.js"></script>
+</body>
+</html>
+
